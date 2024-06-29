@@ -1,56 +1,86 @@
-import flet as ft
+import customtkinter
+import tkinter
+from tkinterdnd2 import TkinterDnD, DND_FILES
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A3, portrait
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
-def main(page: ft.Page):
-    page.title = "svg2pdf"
-    page.window.height = 600
-    page.window.width = 800
+class CTk(customtkinter.CTk, TkinterDnD.DnDWrapper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.TkdndVersion = TkinterDnD._require(self)
 
-    dir_path_default_text = r"保存先ディレクトリを選択してください"
-    dir_path_field = ft.TextField(label="保存先ディレクトリ", disabled=True, value=dir_path_default_text)
+class DirectoryPathFrame(customtkinter.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
 
-    def on_dialog_select_path_result(e: ft.FilePickerResultEvent):
-        dir_path_field.value = e.path
-        page.update()
+        self.label = customtkinter.CTkLabel(self, text="保存先ディレクトリ")
+        self.label.grid(row=0, column=0, padx=10, pady=(10, 0))
 
-    file_picker = ft.FilePicker(on_result=on_dialog_select_path_result)
+        self.text_box = customtkinter.CTkEntry(self, placeholder_text="保存先ディレクトリを選択してください", width=350)
+        self.text_box.grid(row=1, column=0, padx=10, pady=(10, 0))
 
-    page.overlay.append(file_picker)
-    page.update()
+        self.button_select = customtkinter.CTkButton(self, text="ディレクトリを選択...", command=self.select_dir_path)
+        self.button_select.grid(row=1, column=1, padx=10, pady=(10, 0))
 
-    dir_picker = ft.ElevatedButton("ディレクトリを選択...",
-        on_click=lambda _: file_picker.get_directory_path(),
-        col={"sm": 4, "md": 4, "xl": 4})
+    def select_dir_path(self):
+        dir_path = tkinter.filedialog.askdirectory()
+        if dir_path is not None:
+            self.text_box.delete(0, tkinter.END)
+            self.text_box.insert(0, dir_path)
 
-    path_field_row = ft.ResponsiveRow([dir_path_field])
-    dir_picker_row = ft.ResponsiveRow([dir_picker], alignment=ft.MainAxisAlignment.END)
+    def get_dir_path(self):
+        return self.text_box.get()
 
-    page.add(path_field_row, dir_picker_row)
+class DrugAndDropFrame(customtkinter.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
 
-    # def add_clicked(e):
-    #     page.add(ft.Checkbox(label=new_task.value, on_change=checked))
-    #     new_task.value = ""
-    #     new_task.focus()
-    #     new_task.update()
+        self.label = customtkinter.CTkLabel(self, width=350, height=250, text="画像をドラッグ&ドロップ", corner_radius=3)
+        self.label.grid(row=0, column=0, padx=10, pady=(10, 10))
 
-    # def checked(e):
-    #     print("checked")
-    #     # print(dir(e.control.label_style))
-    #     e.control.label_style = ft.Text(italic=True)
+class App(CTk):
+    def __init__(self):
+        super().__init__()
 
-    # def on_dialog_result(e: ft.FilePickerResultEvent):
-    #     print("this is path")
+        self.title("my app")
+        self.geometry("600x400")
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-    # file_picker = ft.FilePicker(on_result=on_dialog_result)
+        self.dir_path_frame = DirectoryPathFrame(self, width=580, height=130)
+        self.dir_path_frame.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="nsew")
 
-    # new_task = ft.TextField(hint_text="what is this", width=300)
-    # # picker = ft.FilePicker()
+        self.drug_and_drop_frame = DrugAndDropFrame(self, width=580, height=230)
+        self.drug_and_drop_frame.drop_target_register(DND_FILES)
+        self.drug_and_drop_frame.dnd_bind('<<Drop>>', self.get_path)
+        self.drug_and_drop_frame.grid(row=1, column=0, padx=10, pady=(10, 10), sticky="nsew")
 
-    # dir_picker = ft.ElevatedButton("Choose dir...",
-    #     on_click=lambda _: file_picker.get_directory_path())
+    def get_path(self, event):
+        dropped_file_paths = event.data.replace("{","").replace("}", "").split()
+        save_dir_path = self.dir_path_frame.get_dir_path() or ""
 
-    # page.overlay.append(file_picker)
-    # page.update()
+        if save_dir_path:
+            self.output_pdf(dropped_file_paths, save_dir_path)
+        else:
+            print("save_dir_path is empty")
 
-    # page.add(ft.Row([new_task, ft.ElevatedButton("Add", on_click=add_clicked), dir_picker]))
+    def output_pdf(self, dropped_file_paths, save_dir_path):
+        file_name = "HelloWorld.pdf"
+        save_file_path = save_dir_path + "/" + file_name
+        pdf_canvas = canvas.Canvas(save_file_path, pagesize=portrait(A3))
+        pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+        font_size = 20
+        pdf_canvas.setFont('HeiseiMin-W3', font_size)
 
-ft.app(target=main)
+        for dir_path in dropped_file_paths:
+            width, height = A3  # A4用紙のサイズ
+            pdf_canvas.drawCentredString(width / 2, height / 2 - font_size * 0.4, dir_path)
+            pdf_canvas.showPage()
+
+        print(save_dir_path)
+        pdf_canvas.save()
+
+app = App()
+app.mainloop()
