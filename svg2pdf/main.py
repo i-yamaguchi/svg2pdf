@@ -6,7 +6,12 @@ from tkinterdnd2 import TkinterDnD, DND_FILES
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A3, portrait
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.graphics import renderPDF
+from svglib.svglib import svg2rlg
+
+NOTO_SANS_JP_FONT_PATH = "./fonts/NotoSansJP-Medium.ttf"
 
 class CTk(customtkinter.CTk, TkinterDnD.DnDWrapper):
     def __init__(self, *args, **kwargs):
@@ -78,12 +83,13 @@ class App(CTk):
         save_file_path = save_dir_path + "/" + file_name
         pdf_canvas = canvas.Canvas(save_file_path, pagesize=portrait(A3))
         pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
+        pdfmetrics.registerFont(TTFont('NotoSansJP', NOTO_SANS_JP_FONT_PATH))
         font_size = 20
         pdf_canvas.setFont('HeiseiMin-W3', font_size)
 
-        for dir_path in dropped_file_paths:
-            width, height = A3
-            pdf_canvas.drawCentredString(width / 2, height / 2 - font_size * 0.4, dir_path)
+        for dropped_file_path in dropped_file_paths:
+            drawing = svg2rlg(dropped_file_path)
+            renderPDF.draw(drawing, pdf_canvas, 0, 0)
             pdf_canvas.showPage()
 
         pdf_canvas.save()
