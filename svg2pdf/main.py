@@ -1,5 +1,7 @@
 import customtkinter
 import tkinter
+import re
+from CTkMessagebox import CTkMessagebox
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A3, portrait
@@ -54,20 +56,25 @@ class App(CTk):
 
         self.drug_and_drop_frame = DrugAndDropFrame(self, width=580, height=230)
         self.drug_and_drop_frame.drop_target_register(DND_FILES)
-        self.drug_and_drop_frame.dnd_bind('<<Drop>>', self.get_path)
+        self.drug_and_drop_frame.dnd_bind('<<Drop>>', self.drug_and_drop_func)
         self.drug_and_drop_frame.grid(row=1, column=0, padx=10, pady=(10, 10), sticky="nsew")
 
-    def get_path(self, event):
-        dropped_file_paths = event.data.replace("{","").replace("}", "").split()
-        save_dir_path = self.dir_path_frame.get_dir_path() or ""
+    def drug_and_drop_func(self, event):
+        dropped_file_paths = App.extract_file_paths(event.data)
+        try:
+            save_dir_path = App.convert_to_save_dir_path(self.dir_path_frame.get_dir_path())
+        except Exception as e:
+            self.show_error_message(e.args)
+            return
 
-        if save_dir_path:
+        try:
             self.output_pdf(dropped_file_paths, save_dir_path)
-        else:
-            print("save_dir_path is empty")
+        except Exception as e:
+            self.show_error_message(e.args)
+            return
 
     def output_pdf(self, dropped_file_paths, save_dir_path):
-        file_name = "HelloWorld.pdf"
+        file_name = "svg2pdf.pdf"
         save_file_path = save_dir_path + "/" + file_name
         pdf_canvas = canvas.Canvas(save_file_path, pagesize=portrait(A3))
         pdfmetrics.registerFont(UnicodeCIDFont('HeiseiMin-W3'))
@@ -75,12 +82,28 @@ class App(CTk):
         pdf_canvas.setFont('HeiseiMin-W3', font_size)
 
         for dir_path in dropped_file_paths:
-            width, height = A3  # A4用紙のサイズ
+            width, height = A3
             pdf_canvas.drawCentredString(width / 2, height / 2 - font_size * 0.4, dir_path)
             pdf_canvas.showPage()
 
-        print(save_dir_path)
         pdf_canvas.save()
+
+    def show_error_message(self, message):
+        CTkMessagebox(title="Error", message=message, icon="cancel")
+
+    @staticmethod
+    def extract_file_paths(data: str) -> list:
+        return data.replace("{","").replace("}", "").split()
+
+    def convert_to_save_dir_path(raw_path) -> str:
+        if raw_path:
+            if re.search(r"/$", raw_path):
+                return raw_path
+            else:
+                return raw_path + "/"
+        else:
+            print("save_dir_path is empty")
+            raise Exception("save_dir_path is empty")
 
 app = App()
 app.mainloop()
